@@ -1,0 +1,25 @@
+plugins {
+    id 'org.springframework.boot' version '3.2.1'
+    id 'io.spring.dependency-management' version '1.1.4'
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name = "SignalBuildArtifacts"
+        url = "https://build-artifacts.signal.org/libraries/maven/"
+    }
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    // implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // AWS DynamoDB
+    implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:3.1.0')
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-dynamodb'
+    
+    // runtimeOnly 'com.h2database:h2'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
