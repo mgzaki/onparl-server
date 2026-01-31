@@ -1,4 +1,4 @@
-package com.example.signal.server.config;
+package com.example.onparl.server.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;

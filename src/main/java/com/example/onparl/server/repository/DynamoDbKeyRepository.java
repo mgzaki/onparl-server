@@ -1,6 +1,6 @@
-package com.example.signal.server.repository;
+package com.example.onparl.server.repository;
 
-import com.example.signal.server.model.KeyEntities;
+import com.example.onparl.server.model.KeyEntities;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
@@ -18,11 +18,11 @@ public class DynamoDbKeyRepository {
     private final DynamoDbTable<KeyEntities.SignedPreKeyEntity> signedPreKeyTable;
 
     public DynamoDbKeyRepository(DynamoDbEnhancedClient enhancedClient) {
-        this.identityKeyTable = enhancedClient.table("signal-identity-keys",
+        this.identityKeyTable = enhancedClient.table("onparl-identity-keys",
                 TableSchema.fromBean(KeyEntities.IdentityKeyEntity.class));
-        this.preKeyTable = enhancedClient.table("signal-pre-keys",
+        this.preKeyTable = enhancedClient.table("onparl-pre-keys",
                 TableSchema.fromBean(KeyEntities.PreKeyEntity.class));
-        this.signedPreKeyTable = enhancedClient.table("signal-signed-pre-keys",
+        this.signedPreKeyTable = enhancedClient.table("onparl-signed-pre-keys",
                 TableSchema.fromBean(KeyEntities.SignedPreKeyEntity.class));
     }
 

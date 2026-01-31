@@ -1,8 +1,8 @@
-package com.example.signal.server.controller;
+package com.example.onparl.server.controller;
 
-import com.example.signal.server.model.SignalMessageEntity;
-import com.example.signal.server.repository.DynamoDbMessageRepository;
-import com.example.signal.server.model.SignalMessage;
+import com.example.onparl.server.model.SignalMessageEntity;
+import com.example.onparl.server.repository.DynamoDbMessageRepository;
+import com.example.onparl.server.model.SignalMessage;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 

@@ -1,4 +1,4 @@
-package com.example.signal.server.model;
+package com.example.onparl.server.model;
 
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;

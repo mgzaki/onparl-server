@@ -1,4 +1,4 @@
-package com.example.signal.server.model;
+package com.example.onparl.server.model;
 
 public class SignalMessage {
     private String senderId;

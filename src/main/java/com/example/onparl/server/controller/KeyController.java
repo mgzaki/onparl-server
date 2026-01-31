@@ -1,7 +1,7 @@
-package com.example.signal.server.controller;
+package com.example.onparl.server.controller;
 
-import com.example.signal.server.model.KeyEntities;
-import com.example.signal.server.repository.DynamoDbKeyRepository;
+import com.example.onparl.server.model.KeyEntities;
+import com.example.onparl.server.repository.DynamoDbKeyRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

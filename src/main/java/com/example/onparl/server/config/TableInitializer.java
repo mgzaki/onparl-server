@@ -1,7 +1,7 @@
-package com.example.signal.server.config;
+package com.example.onparl.server.config;
 
-import com.example.signal.server.model.KeyEntities;
-import com.example.signal.server.model.SignalMessageEntity;
+import com.example.onparl.server.model.KeyEntities;
+import com.example.onparl.server.model.SignalMessageEntity;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -20,10 +20,10 @@ public class TableInitializer {
 
     @EventListener(ApplicationReadyEvent.class)
     public void createTables() {
-        createTable("signal-identity-keys", KeyEntities.IdentityKeyEntity.class);
-        createTable("signal-pre-keys", KeyEntities.PreKeyEntity.class);
-        createTable("signal-signed-pre-keys", KeyEntities.SignedPreKeyEntity.class);
-        createTable("signal-messages", SignalMessageEntity.class);
+        createTable("onparl-identity-keys", KeyEntities.IdentityKeyEntity.class);
+        createTable("onparl-pre-keys", KeyEntities.PreKeyEntity.class);
+        createTable("onparl-signed-pre-keys", KeyEntities.SignedPreKeyEntity.class);
+        createTable("onparl-messages", SignalMessageEntity.class);
     }
 
     private <T> void createTable(String tableName, Class<T> beanClass) {

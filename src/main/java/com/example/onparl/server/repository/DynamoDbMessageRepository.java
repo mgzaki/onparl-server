@@ -1,6 +1,6 @@
-package com.example.signal.server.repository;
+package com.example.onparl.server.repository;
 
-import com.example.signal.server.model.SignalMessageEntity;
+import com.example.onparl.server.model.SignalMessageEntity;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
@@ -17,8 +17,8 @@ public class DynamoDbMessageRepository {
     private final DynamoDbTable<SignalMessageEntity> table;
 
     public DynamoDbMessageRepository(DynamoDbEnhancedClient enhancedClient) {
-        // Bind to table "signal-messages" created in Tofu
-        this.table = enhancedClient.table("signal-messages", TableSchema.fromBean(SignalMessageEntity.class));
+        // Bind to table "onparl-messages" created in Tofu
+        this.table = enhancedClient.table("onparl-messages", TableSchema.fromBean(SignalMessageEntity.class));
     }
 
     public void save(SignalMessageEntity message) {
