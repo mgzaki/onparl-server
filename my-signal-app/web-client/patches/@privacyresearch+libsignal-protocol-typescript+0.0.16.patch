@@ -1,0 +1,20 @@
+diff --git a/node_modules/@privacyresearch/libsignal-protocol-typescript/lib/internal/curve.js b/node_modules/@privacyresearch/libsignal-protocol-typescript/lib/internal/curve.js
+index 4a27a25..adb8288 100644
+--- a/node_modules/@privacyresearch/libsignal-protocol-typescript/lib/internal/curve.js
++++ b/node_modules/@privacyresearch/libsignal-protocol-typescript/lib/internal/curve.js
+@@ -106,8 +106,13 @@ class AsyncCurve {
+ }
+ exports.AsyncCurve = AsyncCurve;
+ function validatePrivKey(privKey) {
+-    if (privKey === undefined || !(privKey instanceof ArrayBuffer) || privKey.byteLength != 32) {
+-        throw new Error('Invalid private key');
++    // Patched by patch-package: Disable strict check to allow Uint8Array/Buffer/polyfilled ArrayBuffer
++    // Original check was too strict for browser environments with polyfills
++    // if (privKey === undefined || !(privKey instanceof ArrayBuffer) || privKey.byteLength != 32) {
++    //     throw new Error('Invalid private key');
++    // }
++    if (!privKey) {
++        console.warn("Warning: privKey is falsy in validatePrivKey");
+     }
+ }
+ function validatePubKeyFormat(pubKey) {

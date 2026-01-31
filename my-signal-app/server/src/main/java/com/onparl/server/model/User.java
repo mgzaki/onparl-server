@@ -1,0 +1,165 @@
+package com.onparl.server.model;
+
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
+
+/**
+ * User entity for phone-based authentication.
+ * 
+ * Stores registered users with their phone numbers and generated user IDs.
+ * After successful OTP verification, a User record is created or updated.
+ * 
+ * DynamoDB Table: onparl-users
+ * - Partition Key: phoneNumber
+ * - GSI: userId-index (for userId lookups)
+ */
+@DynamoDbBean
+public class User {
+
+    /**
+     * Phone number in E.164 format (e.g., +14155552671).
+     * This is the partition key for efficient lookups.
+     */
+    private String phoneNumber;
+
+    /**
+     * Unique user ID generated upon first registration.
+     * Format: "user_" + UUID.
+     * Used for Signal Protocol operations and chat identification.
+     */
+    private String userId;
+
+    /**
+     * Whether the phone number has been verified via OTP.
+     * Set to true after successful OTP verification.
+     */
+    private boolean verified;
+
+    /**
+     * Unix timestamp (milliseconds) when the user first registered.
+     */
+    private long createdAt;
+
+    /**
+     * Unix timestamp (milliseconds) of the last successful login.
+     * Updated on each OTP verification.
+     */
+    private long lastLoginAt;
+
+    /**
+     * User's display name.
+     * Required during profile setup, can be updated later.
+     * Max length: 50 characters.
+     */
+    private String displayName;
+
+    /**
+     * User's profile picture.
+     * Stored as Base64 encoded image data (for simplicity).
+     * Format: "data:image/png;base64,..."
+     * Can be migrated to S3 URL later for production.
+     * Max size: ~400KB when Base64 encoded.
+     */
+    private String profilePicture;
+
+    /**
+     * User's mood/status message.
+     * Short text displayed alongside user profile.
+     * Max length: 100 characters.
+     * Can include emojis.
+     */
+    private String mood;
+
+    /**
+     * Flag indicating whether the user has completed profile setup.
+     * Set to true after user provides at least a display name.
+     * New users must complete profile setup before accessing chat.
+     */
+    private boolean profileComplete;
+
+    public User() {
+        // Default constructor required by DynamoDB mapper
+    }
+
+    /**
+     * Get the phone number (partition key).
+     */
+    @DynamoDbPartitionKey
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+
+    /**
+     * Get the user ID (GSI partition key for userId-index).
+     * This allows looking up users by userId as well as phoneNumber.
+     */
+    @DynamoDbSecondaryPartitionKey(indexNames = "userId-index")
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
+    public boolean isVerified() {
+        return verified;
+    }
+
+    public void setVerified(boolean verified) {
+        this.verified = verified;
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(long createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public long getLastLoginAt() {
+        return lastLoginAt;
+    }
+
+    public void setLastLoginAt(long lastLoginAt) {
+        this.lastLoginAt = lastLoginAt;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
+
+    public String getProfilePicture() {
+        return profilePicture;
+    }
+
+    public void setProfilePicture(String profilePicture) {
+        this.profilePicture = profilePicture;
+    }
+
+    public String getMood() {
+        return mood;
+    }
+
+    public void setMood(String mood) {
+        this.mood = mood;
+    }
+
+    public boolean isProfileComplete() {
+        return profileComplete;
+    }
+
+    public void setProfileComplete(boolean profileComplete) {
+        this.profileComplete = profileComplete;
+    }
+}
