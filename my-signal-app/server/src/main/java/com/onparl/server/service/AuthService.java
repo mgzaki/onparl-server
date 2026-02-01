@@ -10,14 +10,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Authentication service that orchestrates the phone-based authentication flow.
- * 
- * AUTHENTICATION FLOW:
- * 1. User requests OTP for their phone number
- * 2. OTP is generated and sent via SMS
- * 3. User submits OTP for verification
- * 4. If valid, user is authenticated and userId is returned
- * 5. New users are automatically registered, returning users are logged in
+ * Authentication service that orchestrates the authentication flow.
+ * Supports both Phone (SMS) and Email authentication.
  */
 @Service
 public class AuthService {
@@ -26,60 +20,65 @@ public class AuthService {
 
     private final OtpService otpService;
     private final SmsService smsService;
+    private final EmailService emailService;
     private final DynamoDbUserRepository userRepository;
 
-    public AuthService(OtpService otpService, SmsService smsService, DynamoDbUserRepository userRepository) {
+    public AuthService(OtpService otpService, SmsService smsService, EmailService emailService,
+            DynamoDbUserRepository userRepository) {
         this.otpService = otpService;
         this.smsService = smsService;
+        this.emailService = emailService;
         this.userRepository = userRepository;
     }
 
     /**
-     * Request an OTP to be sent to the phone number.
+     * Request an OTP to be sent to the identifier (phone or email).
      * 
-     * @param phoneNumber Phone number in E.164 format
-     * @throws IllegalArgumentException if phone number is invalid
-     * @throws IllegalStateException    if rate limit is exceeded
+     * @param identifier Phone number or Email address
+     * @param type       "PHONE" or "EMAIL"
      */
-    public void requestOtp(String phoneNumber) {
-        // Validate phone number format
-        if (!smsService.isValidPhoneNumber(phoneNumber)) {
-            throw new IllegalArgumentException("Invalid phone number format");
+    public void requestOtp(String identifier, String type) {
+        if ("PHONE".equalsIgnoreCase(type)) {
+            // Validate phone number
+            if (!smsService.isValidPhoneNumber(identifier)) {
+                throw new IllegalArgumentException("Invalid phone number format");
+            }
+            // Generate & Send OTP
+            String otp = otpService.generateOtp(identifier);
+            smsService.sendOtp(identifier, otp);
+            logger.info("OTP requested for phone: {}", maskIdentifier(identifier));
+
+        } else if ("EMAIL".equalsIgnoreCase(type)) {
+            // Validate email
+            if (!emailService.isValidEmail(identifier)) {
+                throw new IllegalArgumentException("Invalid email format");
+            }
+            // Generate & Send OTP
+            String otp = otpService.generateOtp(identifier);
+            emailService.sendOtp(identifier, otp);
+            logger.info("OTP requested for email: {}", identifier);
+
+        } else {
+            throw new IllegalArgumentException("Invalid authentication type: " + type);
         }
-
-        // Generate OTP (throws exception if rate limited)
-        String otp = otpService.generateOtp(phoneNumber);
-
-        // Send OTP via SMS
-        smsService.sendOtp(phoneNumber, otp);
-
-        logger.info("OTP requested for phone: {}", maskPhoneNumber(phoneNumber));
     }
 
     /**
      * Verify OTP and authenticate the user.
-     * 
-     * For new users: Creates a user account
-     * For existing users: Updates last login time
-     * 
-     * @param phoneNumber Phone number in E.164 format
-     * @param otp         The OTP code to verify
-     * @return The authenticated User object
-     * @throws IllegalArgumentException if OTP is invalid or expired
      */
-    public User verifyOtpAndLogin(String phoneNumber, String otp) {
+    public User verifyOtpAndLogin(String identifier, String otp, String type) {
         // Verify the OTP
-        boolean isValid = otpService.verifyOtp(phoneNumber, otp);
+        boolean isValid = otpService.verifyOtp(identifier, otp);
 
         if (!isValid) {
-            int remainingAttempts = otpService.getRemainingAttempts(phoneNumber);
-            logger.warn("Invalid OTP attempt for phone: {}. Remaining attempts: {}",
-                    maskPhoneNumber(phoneNumber), remainingAttempts);
+            int remainingAttempts = otpService.getRemainingAttempts(identifier);
+            logger.warn("Invalid OTP attempt for: {}. Remaining attempts: {}",
+                    maskIdentifier(identifier), remainingAttempts);
             throw new IllegalArgumentException("Invalid or expired OTP. Attempts remaining: " + remainingAttempts);
         }
 
         // Get or create user
-        User user = getOrCreateUser(phoneNumber);
+        User user = getOrCreateUser(identifier, type);
 
         // Update last login time
         user.setLastLoginAt(System.currentTimeMillis());
@@ -93,26 +92,29 @@ public class AuthService {
 
     /**
      * Get an existing user or create a new one.
-     * 
-     * @param phoneNumber Phone number in E.164 format
-     * @return User object (existing or newly created)
      */
-    public User getOrCreateUser(String phoneNumber) {
-        Optional<User> existingUser = userRepository.findByPhoneNumber(phoneNumber);
+    public User getOrCreateUser(String identifier, String type) {
+        Optional<User> existingUser = userRepository.findById(identifier);
 
         if (existingUser.isPresent()) {
-            logger.info("Returning user login: {}", existingUser.get().getUserId());
             return existingUser.get();
         }
 
         // Create new user
         User newUser = new User();
-        newUser.setPhoneNumber(phoneNumber);
+        newUser.setId(identifier); // Partition Key
+
+        if ("PHONE".equalsIgnoreCase(type)) {
+            newUser.setPhoneNumber(identifier);
+        } else {
+            newUser.setEmail(identifier);
+        }
+
         newUser.setUserId(generateUserId());
         newUser.setVerified(false);
         newUser.setCreatedAt(System.currentTimeMillis());
         newUser.setLastLoginAt(System.currentTimeMillis());
-        newUser.setProfileComplete(false); // Profile setup required
+        newUser.setProfileComplete(false);
 
         userRepository.saveUser(newUser);
 
@@ -122,64 +124,60 @@ public class AuthService {
     }
 
     /**
+     * Dev Login: Bypass OTP and log in directly.
+     * Only for testing purposes.
+     */
+    public User devLogin(String identifier, String type) {
+        logger.warn("DEV LOGIN requested for: {}", identifier);
+
+        // Get or create user
+        User user = getOrCreateUser(identifier, type);
+
+        // Update last login time
+        user.setLastLoginAt(System.currentTimeMillis());
+        // Auto-verify in dev mode
+        user.setVerified(true);
+        userRepository.saveUser(user);
+
+        return user;
+    }
+
+    /**
      * Get a user by their userId.
-     * 
-     * @param userId The user ID
-     * @return User object if found
      */
     public Optional<User> getUserByUserId(String userId) {
         return userRepository.findByUserId(userId);
     }
 
     /**
-     * Get a user by their phone number.
-     * 
-     * @param phoneNumber Phone number in E.164 format
-     * @return User object if found
+     * Get a user by their identifier (phone or email).
      */
-    public Optional<User> getUserByPhoneNumber(String phoneNumber) {
-        return userRepository.findByPhoneNumber(phoneNumber);
+    public Optional<User> getUserByIdentifier(String identifier) {
+        return userRepository.findById(identifier);
     }
 
     /**
-     * Invalidate any existing OTP for a phone number.
-     * Useful for logout or when user abandons authentication.
-     * 
-     * @param phoneNumber Phone number in E.164 format
+     * Invalidate any existing OTP.
      */
-    public void invalidateOtp(String phoneNumber) {
-        otpService.invalidateOtp(phoneNumber);
-        logger.info("OTP invalidated for phone: {}", maskPhoneNumber(phoneNumber));
+    public void invalidateOtp(String identifier) {
+        otpService.invalidateOtp(identifier);
     }
 
     /**
      * Get time remaining until OTP expiry.
-     * 
-     * @param phoneNumber Phone number in E.164 format
-     * @return Seconds until expiry, or 0 if no OTP exists
      */
-    public long getOtpExpirySeconds(String phoneNumber) {
-        return otpService.getSecondsUntilExpiry(phoneNumber);
+    public long getOtpExpirySeconds(String identifier) {
+        return otpService.getSecondsUntilExpiry(identifier);
     }
 
-    /**
-     * Generate a unique user ID.
-     * Format: "user_" + UUID
-     */
     private String generateUserId() {
         return "user_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
     }
 
-    /**
-     * Mask a phone number for logging.
-     */
-    private String maskPhoneNumber(String phoneNumber) {
-        if (phoneNumber == null || phoneNumber.length() < 8) {
+    private String maskIdentifier(String identifier) {
+        if (identifier == null || identifier.length() < 4) {
             return "****";
         }
-
-        int visibleDigits = 7;
-        String visible = phoneNumber.substring(0, Math.min(phoneNumber.length(), visibleDigits));
-        return visible + "****";
+        return identifier.substring(0, Math.min(identifier.length(), 3)) + "****";
     }
 }

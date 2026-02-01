@@ -12,13 +12,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * REST API Controller for phone-based authentication.
+ * REST API Controller for authentication (Phone/SMS and Email).
  * 
  * Endpoints:
- * - POST /api/auth/request-otp: Request an OTP to be sent via SMS
+ * - POST /api/auth/request-otp: Request an OTP
  * - POST /api/auth/verify-otp: Verify OTP and authenticate user
- * - POST /api/auth/resend-otp: Resend OTP (same as request-otp with rate
- * limits)
+ * - POST /api/auth/resend-otp: Resend OTP
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -28,56 +27,98 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @org.springframework.beans.factory.annotation.Value("${onparl.auth.dev-mode:false}")
+    private boolean devMode;
+
     public AuthController(AuthService authService) {
         this.authService = authService;
     }
 
     /**
-     * Request an OTP to be sent to the phone number.
-     * 
-     * POST /api/auth/request-otp
-     * Body: { "phoneNumber": "+14155552671" }
-     * 
-     * Success Response (200):
-     * {
-     * "success": true,
-     * "message": "OTP sent to +1415555****",
-     * "expiresIn": 300
-     * }
-     * 
-     * Error Responses:
-     * - 400: Invalid phone number
-     * - 429: Rate limit exceeded
-     * - 500: SMS delivery failure
+     * Dev Login: Bypass OTP.
+     * Only enabled if onparl.auth.dev-mode=true
      */
-    @PostMapping("/request-otp")
-    public ResponseEntity<Map<String, Object>> requestOtp(@RequestBody Map<String, String> request) {
-        String phoneNumber = request.get("phoneNumber");
+    @PostMapping("/dev-login")
+    public ResponseEntity<Map<String, Object>> devLogin(@RequestBody Map<String, String> request) {
+        if (!devMode) {
+            return errorResponse("Dev mode is disabled.", HttpStatus.FORBIDDEN);
+        }
 
-        if (phoneNumber == null || phoneNumber.trim().isEmpty()) {
-            return errorResponse("Phone number is required", HttpStatus.BAD_REQUEST);
+        String identifier = request.get("identifier");
+        String type = request.get("type");
+
+        if (identifier == null || identifier.trim().isEmpty()) {
+            return errorResponse("Identifier is required", HttpStatus.BAD_REQUEST);
+        }
+        if (type == null) {
+            type = identifier.contains("@") ? "EMAIL" : "PHONE";
         }
 
         try {
-            authService.requestOtp(phoneNumber);
+            User user = authService.devLogin(identifier, type);
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("message", "OTP sent to " + maskPhoneNumber(phoneNumber));
+            response.put("userId", user.getUserId());
+            response.put("identifier", user.getId());
+            response.put("isNewUser", false); // Assume verified for dev
+            response.put("displayName", user.getDisplayName());
+            response.put("profileComplete", user.isProfileComplete());
+            response.put("devMode", true);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            logger.error("Dev login failed", e);
+            return errorResponse("Dev login failed: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Request an OTP to be sent to the identifier (phone or email).
+     * 
+     * Body: { "identifier": "+1415...", "type": "PHONE" }
+     * OR: { "identifier": "user@example.com", "type": "EMAIL" }
+     */
+    @PostMapping("/request-otp")
+    public ResponseEntity<Map<String, Object>> requestOtp(@RequestBody Map<String, String> request) {
+        String identifier = request.get("identifier");
+        String type = request.get("type"); // PHONE or EMAIL
+
+        // Backward compatibility for old clients sending "phoneNumber"
+        if (identifier == null && request.containsKey("phoneNumber")) {
+            identifier = request.get("phoneNumber");
+            type = "PHONE";
+        }
+
+        if (identifier == null || identifier.trim().isEmpty()) {
+            return errorResponse("Identifier (phone or email) is required", HttpStatus.BAD_REQUEST);
+        }
+
+        if (type == null || type.trim().isEmpty()) {
+            return errorResponse("Authentication type (PHONE or EMAIL) is required", HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            authService.requestOtp(identifier, type);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "OTP sent to " + maskIdentifier(identifier));
             response.put("expiresIn", 300); // 5 minutes
 
             return ResponseEntity.ok(response);
 
         } catch (IllegalArgumentException e) {
-            logger.warn("Invalid phone number: {}", phoneNumber);
+            logger.warn("Invalid identifier: {}", identifier);
             return errorResponse(e.getMessage(), HttpStatus.BAD_REQUEST);
 
         } catch (IllegalStateException e) {
-            logger.warn("Rate limit exceeded for: {}", phoneNumber);
+            logger.warn("Rate limit exceeded for: {}", identifier);
             return errorResponse(e.getMessage(), HttpStatus.TOO_MANY_REQUESTS);
 
         } catch (Exception e) {
-            logger.error("Error sending OTP to: {}", phoneNumber, e);
+            logger.error("Error sending OTP to: {}", identifier, e);
             return errorResponse("Failed to send OTP. Please try again.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -85,29 +126,22 @@ public class AuthController {
     /**
      * Verify OTP and authenticate the user.
      * 
-     * POST /api/auth/verify-otp
-     * Body: { "phoneNumber": "+14155552671", "otp": "123456" }
-     * 
-     * Success Response (200):
-     * {
-     * "success": true,
-     * "userId": "user_abc123",
-     * "phoneNumber": "+14155552671",
-     * "isNewUser": false
-     * }
-     * 
-     * Error Responses:
-     * - 400: Missing fields
-     * - 401: Invalid or expired OTP
-     * - 500: Server error
+     * Body: { "identifier": "...", "otp": "...", "type": "..." }
      */
     @PostMapping("/verify-otp")
     public ResponseEntity<Map<String, Object>> verifyOtp(@RequestBody Map<String, String> request) {
-        String phoneNumber = request.get("phoneNumber");
+        String identifier = request.get("identifier");
         String otp = request.get("otp");
+        String type = request.get("type");
 
-        if (phoneNumber == null || phoneNumber.trim().isEmpty()) {
-            return errorResponse("Phone number is required", HttpStatus.BAD_REQUEST);
+        // Backward compatibility
+        if (identifier == null && request.containsKey("phoneNumber")) {
+            identifier = request.get("phoneNumber");
+            type = "PHONE";
+        }
+
+        if (identifier == null || identifier.trim().isEmpty()) {
+            return errorResponse("Identifier is required", HttpStatus.BAD_REQUEST);
         }
 
         if (otp == null || otp.trim().isEmpty()) {
@@ -115,16 +149,24 @@ public class AuthController {
         }
 
         try {
-            // Check if this is a new user (before verification)
-            boolean isNewUser = authService.getUserByPhoneNumber(phoneNumber).isEmpty();
+            // Check if this is a new user (before verification) - check if generic ID
+            // exists
+            boolean isNewUser = authService.getUserByIdentifier(identifier).isEmpty();
 
             // Verify OTP and authenticate
-            User user = authService.verifyOtpAndLogin(phoneNumber, otp);
+            User user = authService.verifyOtpAndLogin(identifier, otp, type);
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("userId", user.getUserId());
-            response.put("phoneNumber", user.getPhoneNumber());
+            response.put("identifier", user.getId());
+
+            // Return specific fields based on type
+            if (user.getPhoneNumber() != null)
+                response.put("phoneNumber", user.getPhoneNumber());
+            if (user.getEmail() != null)
+                response.put("email", user.getEmail());
+
             response.put("isNewUser", isNewUser);
             response.put("displayName", user.getDisplayName());
             response.put("profileComplete", user.isProfileComplete());
@@ -132,36 +174,30 @@ public class AuthController {
             return ResponseEntity.ok(response);
 
         } catch (IllegalArgumentException e) {
-            logger.warn("Invalid OTP for phone: {}", maskPhoneNumber(phoneNumber));
+            logger.warn("Invalid OTP for: {}", maskIdentifier(identifier));
             return errorResponse(e.getMessage(), HttpStatus.UNAUTHORIZED);
 
         } catch (Exception e) {
-            logger.error("Error verifying OTP for: {}", phoneNumber, e);
-            return errorResponse("Authentication failed. Please try again.", HttpStatus.INTERNAL_SERVER_ERROR);
+            logger.error("Error verifying OTP for: {}", identifier, e);
+            return errorResponse("Authentication failed. " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Resend OTP (same as request-otp, with rate limiting).
-     * 
-     * POST /api/auth/resend-otp
-     * Body: { "phoneNumber": "+14155552671" }
+     * Resend OTP.
      */
     @PostMapping("/resend-otp")
     public ResponseEntity<Map<String, Object>> resendOtp(@RequestBody Map<String, String> request) {
-        // Resend is the same as requesting a new OTP
         return requestOtp(request);
     }
 
     /**
-     * Get authentication status for a phone number (for debugging).
-     * 
-     * GET /api/auth/status?phoneNumber=+14155552671
+     * Get authentication status.
      */
     @GetMapping("/status")
-    public ResponseEntity<Map<String, Object>> getAuthStatus(@RequestParam String phoneNumber) {
+    public ResponseEntity<Map<String, Object>> getAuthStatus(@RequestParam String identifier) {
         try {
-            long expirySeconds = authService.getOtpExpirySeconds(phoneNumber);
+            long expirySeconds = authService.getOtpExpirySeconds(identifier);
             boolean hasActiveOtp = expirySeconds > 0;
 
             Map<String, Object> response = new HashMap<>();
@@ -176,9 +212,6 @@ public class AuthController {
         }
     }
 
-    /**
-     * Helper method to create error responses.
-     */
     private ResponseEntity<Map<String, Object>> errorResponse(String message, HttpStatus status) {
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
@@ -186,16 +219,10 @@ public class AuthController {
         return ResponseEntity.status(status).body(response);
     }
 
-    /**
-     * Mask phone number for logging and responses.
-     */
-    private String maskPhoneNumber(String phoneNumber) {
-        if (phoneNumber == null || phoneNumber.length() < 8) {
+    private String maskIdentifier(String identifier) {
+        if (identifier == null || identifier.length() < 4) {
             return "****";
         }
-
-        int visibleDigits = 7;
-        String visible = phoneNumber.substring(0, Math.min(phoneNumber.length(), visibleDigits));
-        return visible + "****";
+        return identifier.substring(0, Math.min(identifier.length(), 3)) + "****";
     }
 }

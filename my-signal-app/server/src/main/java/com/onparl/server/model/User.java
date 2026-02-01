@@ -18,10 +18,20 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecon
 public class User {
 
     /**
-     * Phone number in E.164 format (e.g., +14155552671).
-     * This is the partition key for efficient lookups.
+     * Unique identifier (Partition Key).
+     * Can be either a phone number (e.g., +1415...) or an email address.
+     */
+    private String id;
+
+    /**
+     * Phone number in E.164 format (optional if using email).
      */
     private String phoneNumber;
+
+    /**
+     * Email address (optional if using phone).
+     */
+    private String email;
 
     /**
      * Unique user ID generated upon first registration.
@@ -83,9 +93,17 @@ public class User {
     }
 
     /**
-     * Get the phone number (partition key).
+     * Get the unique identifier (partition key).
      */
     @DynamoDbPartitionKey
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
     public String getPhoneNumber() {
         return phoneNumber;
     }
@@ -94,9 +112,17 @@ public class User {
         this.phoneNumber = phoneNumber;
     }
 
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
     /**
      * Get the user ID (GSI partition key for userId-index).
-     * This allows looking up users by userId as well as phoneNumber.
+     * This allows looking up users by userId.
      */
     @DynamoDbSecondaryPartitionKey(indexNames = "userId-index")
     public String getUserId() {

@@ -28,6 +28,11 @@ module "networking" {
   aws_region = var.aws_region
 }
 
+module "ses" {
+  source       = "./modules/ses"
+  sender_email = var.sender_email
+}
+
 module "compute" {
   source = "./modules/compute"
 

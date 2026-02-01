@@ -107,7 +107,18 @@ resource "aws_iam_role_policy" "dynamodb_access" {
           "dynamodb:BatchGetItem",
           "dynamodb:BatchWriteItem"
         ]
-        Resource = var.database_arns
+        Resource = flatten([
+          var.database_arns,
+          [for arn in var.database_arns : "${arn}/index/*"]
+        ])
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ses:SendEmail",
+          "ses:SendRawEmail"
+        ]
+        Resource = "*"
       }
     ]
   })

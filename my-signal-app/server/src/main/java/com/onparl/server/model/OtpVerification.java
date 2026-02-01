@@ -24,9 +24,10 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbParti
 public class OtpVerification {
 
     /**
-     * Phone number in E.164 format (partition key).
+     * Unique identifier (Partition Key).
+     * Can be either a phone number or an email address.
      */
-    private String phoneNumber;
+    private String identifier;
 
     /**
      * SHA-256 hash of the OTP code.
@@ -72,15 +73,15 @@ public class OtpVerification {
     }
 
     /**
-     * Get the phone number (partition key).
+     * Get the identifier (partition key).
      */
     @DynamoDbPartitionKey
-    public String getPhoneNumber() {
-        return phoneNumber;
+    public String getIdentifier() {
+        return identifier;
     }
 
-    public void setPhoneNumber(String phoneNumber) {
-        this.phoneNumber = phoneNumber;
+    public void setIdentifier(String identifier) {
+        this.identifier = identifier;
     }
 
     public String getOtpHash() {

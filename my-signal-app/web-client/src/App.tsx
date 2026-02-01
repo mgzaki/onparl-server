@@ -48,7 +48,8 @@ type AuthStep = 'phone' | 'otp' | 'profile' | 'authenticated';
 function App() {
   // Authentication state
   const [authStep, setAuthStep] = useState<AuthStep>('phone');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [authType, setAuthType] = useState<'PHONE' | 'EMAIL'>('PHONE');
+  const [identifier, setIdentifier] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [userId, setUserId] = useState('');
   const [isNewUser, setIsNewUser] = useState(false);
@@ -104,24 +105,29 @@ function App() {
   }, []);
 
   /**
-   * REQUEST OTP - Step 1: Send OTP to phone number
+   * REQUEST OTP - Step 1: Send OTP to identifier
    */
   const requestOtp = async () => {
-    if (!phoneNumber.trim()) {
-      showSnackbar('Please enter a valid phone number', 'error');
+    if (!identifier.trim()) {
+      showSnackbar(`Please enter a valid ${authType === 'PHONE' ? 'phone number' : 'email'}`, 'error');
       return;
     }
 
-    // Basic phone validation (must start with +)
-    if (!phoneNumber.startsWith('+')) {
+    if (authType === 'PHONE' && !identifier.startsWith('+')) {
       showSnackbar('Phone number must start with + and country code (e.g., +1)', 'error');
+      return;
+    }
+
+    if (authType === 'EMAIL' && !identifier.includes('@')) {
+      showSnackbar('Please enter a valid email address', 'error');
       return;
     }
 
     setLoading(true);
     try {
       const response = await axios.post(`${SERVER_URL}/api/auth/request-otp`, {
-        phoneNumber: phoneNumber.trim(),
+        identifier: identifier.trim(),
+        type: authType
       });
 
       if (response.data.success) {
@@ -143,6 +149,43 @@ function App() {
   };
 
   /**
+   * DEV LOGIN - Bypass OTP
+   */
+  const handleDevLogin = async () => {
+    if (!identifier.trim()) {
+      showSnackbar('Please enter an identifier', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await axios.post(`${SERVER_URL}/api/auth/dev-login`, {
+        identifier: identifier.trim(),
+        type: identifier.includes('@') ? 'EMAIL' : 'PHONE'
+      });
+
+      if (response.data.success) {
+        setUserId(response.data.userId);
+        setIsNewUser(response.data.isNewUser);
+        showSnackbar('Dev Login successful!', 'success');
+        log(`Dev Authenticated as ${response.data.userId}`);
+
+        if (!response.data.profileComplete) {
+          setAuthStep('profile');
+        } else {
+          await initializeSignal(response.data.userId);
+        }
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.error || 'Dev Login failed';
+      showSnackbar(errorMsg, 'error');
+      log(`Dev Login failed: ${errorMsg}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
    * VERIFY OTP - Step 2: Verify OTP and authenticate
    */
   const verifyOtp = async () => {
@@ -156,8 +199,9 @@ function App() {
     setLoading(true);
     try {
       const response = await axios.post(`${SERVER_URL}/api/auth/verify-otp`, {
-        phoneNumber: phoneNumber.trim(),
+        identifier: identifier.trim(),
         otp: otpCode,
+        type: authType
       });
 
       if (response.data.success) {
@@ -401,35 +445,64 @@ function App() {
                     boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)',
                   }}
                 >
-                  <PhoneIcon sx={{ fontSize: 40, color: 'white' }} />
+                  {authType === 'PHONE' ? <PhoneIcon sx={{ fontSize: 40, color: 'white' }} /> : <ChatIcon sx={{ fontSize: 40, color: 'white' }} />}
                 </Box>
                 <Typography variant="h3" gutterBottom fontWeight="bold" color="primary">
                   Onparl Chat
                 </Typography>
                 <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
-                  Secure Phone Authentication
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Powered by Signal Protocol (X3DH)
+                  Secure Authentication
                 </Typography>
               </Box>
 
+              <Stack direction="row" spacing={2} sx={{ mb: 3 }} justifyContent="center">
+                <Button
+                  variant={authType === 'PHONE' ? 'contained' : 'outlined'}
+                  onClick={() => { setAuthType('PHONE'); setIdentifier(''); }}
+                >
+                  Phone
+                </Button>
+                <Button
+                  variant={authType === 'EMAIL' ? 'contained' : 'outlined'}
+                  onClick={() => { setAuthType('EMAIL'); setIdentifier(''); }}
+                >
+                  Email
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  onClick={() => { setAuthType('DEV' as any); setIdentifier(''); }}
+                  sx={{ borderColor: '#f59e0b', color: '#f59e0b', '&:hover': { borderColor: '#d97706', bgcolor: 'rgba(245, 158, 11, 0.04)' } }}
+                >
+                  Dev / Test
+                </Button>
+              </Stack>
+
               <TextField
                 fullWidth
-                label="Phone Number"
-                placeholder="+1 234 567 8900"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                onKeyPress={handleKeyPress}
+                label={authType === 'PHONE' ? "Phone Number" : authType === 'EMAIL' ? "Email Address" : "Any Identifier (Dev Mode)"}
+                placeholder={authType === 'PHONE' ? "+1 234 567 8900" : authType === 'EMAIL' ? "user@example.com" : "test-user-1"}
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                onKeyPress={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if ((authType as any) === 'DEV') {
+                      handleDevLogin();
+                    } else {
+                      requestOtp();
+                    }
+                  }
+                }}
                 disabled={loading}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <PhoneIcon color="primary" />
+                      {authType === 'PHONE' ? <PhoneIcon color="primary" /> : authType === 'EMAIL' ? <PersonIcon color="primary" /> : <BugReportIcon color="warning" />}
                     </InputAdornment>
                   ),
                 }}
-                helperText="Enter your phone number with country code (e.g., +1 for US)"
+                helperText={authType === 'PHONE' ? "Enter phone with country code (e.g., +1)" : "Enter your email address"}
                 sx={{ mb: 3 }}
               />
 
@@ -437,19 +510,19 @@ function App() {
                 fullWidth
                 variant="contained"
                 size="large"
-                onClick={requestOtp}
-                disabled={loading || !phoneNumber.trim()}
+                onClick={(authType as any) === 'DEV' ? handleDevLogin : requestOtp}
+                disabled={loading || !identifier.trim()}
                 startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <LockIcon />}
                 sx={{
                   py: 1.5,
                   fontSize: '1.1rem',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: (authType as any) === 'DEV' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #5568d3 0%, #6a4292 100%)',
+                    background: (authType as any) === 'DEV' ? 'linear-gradient(135deg, #d97706 0%, #b45309 100%)' : 'linear-gradient(135deg, #5568d3 0%, #6a4292 100%)',
                   },
                 }}
               >
-                {loading ? 'Sending...' : 'Send Verification Code'}
+                {loading ? 'Processing...' : (authType as any) === 'DEV' ? 'Dev Login (Bypass One Time Password)' : 'Send Verification Code'}
               </Button>
             </Paper>
           </Container>
@@ -493,7 +566,7 @@ function App() {
                   We sent a 6-digit code to
                 </Typography>
                 <Typography variant="h6" color="text.primary" fontWeight="600">
-                  {phoneNumber}
+                  {identifier}
                 </Typography>
               </Box>
 
@@ -560,6 +633,7 @@ function App() {
                 onClick={() => {
                   setAuthStep('phone');
                   setOtp(['', '', '', '', '', '']);
+                  setIdentifier('');
                 }}
                 startIcon={<RefreshIcon />}
               >

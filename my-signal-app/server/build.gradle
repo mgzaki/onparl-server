@@ -24,6 +24,9 @@ dependencies {
     
     // AWS SNS for SMS
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-sns'
+    // AWS SES for Email
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-ses'
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
     
     // AWS S3 for profile pictures
     implementation 'software.amazon.awssdk:s3:2.20.26'

@@ -3,21 +3,21 @@
 resource "aws_dynamodb_table" "users" {
   name           = "onparl-users"
   billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "userId"
+  hash_key       = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
 
   attribute {
     name = "userId"
     type = "S"
   }
 
-  attribute {
-    name = "phoneNumber"
-    type = "S"
-  }
-
   global_secondary_index {
-    name            = "PhoneNumberIndex"
-    hash_key        = "phoneNumber"
+    name            = "userId-index"
+    hash_key        = "userId"
     projection_type = "ALL"
   }
 
@@ -30,10 +30,10 @@ resource "aws_dynamodb_table" "users" {
 resource "aws_dynamodb_table" "otps" {
   name           = "onparl-otps"
   billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "phoneNumber"
+  hash_key       = "identifier"
 
   attribute {
-    name = "phoneNumber"
+    name = "identifier"
     type = "S"
   }
 

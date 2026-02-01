@@ -1,0 +1,22 @@
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+
+# IDE
+.vscode/
+.idea/
+
+# Java / Gradle
+**/build/
+.gradle/
+
+# Node / JS
+**/node_modules/
+**/dist/
+**/coverage/
+
+# Misc
+.DS_Store
+.env

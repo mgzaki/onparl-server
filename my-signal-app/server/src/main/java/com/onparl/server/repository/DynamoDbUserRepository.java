@@ -36,11 +36,11 @@ public class DynamoDbUserRepository {
     }
 
     /**
-     * Find a user by phone number (partition key lookup - very fast).
+     * Find a user by unique identifier (partition key lookup - very fast).
      */
-    public Optional<User> findByPhoneNumber(String phoneNumber) {
+    public Optional<User> findById(String id) {
         Key key = Key.builder()
-                .partitionValue(phoneNumber)
+                .partitionValue(id)
                 .build();
 
         User user = userTable.getItem(key);
@@ -64,28 +64,28 @@ public class DynamoDbUserRepository {
     /**
      * Update the last login timestamp for a user.
      */
-    public void updateLastLogin(String phoneNumber) {
-        findByPhoneNumber(phoneNumber).ifPresent(user -> {
+    public void updateLastLogin(String id) {
+        findById(id).ifPresent(user -> {
             user.setLastLoginAt(System.currentTimeMillis());
             saveUser(user);
         });
     }
 
     /**
-     * Delete a user by phone number.
+     * Delete a user by id.
      */
-    public void deleteUser(String phoneNumber) {
+    public void deleteUser(String id) {
         Key key = Key.builder()
-                .partitionValue(phoneNumber)
+                .partitionValue(id)
                 .build();
 
         userTable.deleteItem(key);
     }
 
     /**
-     * Check if a user exists by phone number.
+     * Check if a user exists by id.
      */
-    public boolean existsByPhoneNumber(String phoneNumber) {
-        return findByPhoneNumber(phoneNumber).isPresent();
+    public boolean existsById(String id) {
+        return findById(id).isPresent();
     }
 }

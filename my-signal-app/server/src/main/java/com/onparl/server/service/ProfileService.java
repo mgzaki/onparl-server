@@ -25,8 +25,9 @@ public class ProfileService {
     private static final int MOOD_MAX_LENGTH = 100;
     private static final int PROFILE_PICTURE_MAX_SIZE = 500_000; // ~500KB Base64
 
-    // Regex for display name: alphanumeric, spaces, basic punctuation, emojis
-    private static final Pattern DISPLAY_NAME_PATTERN = Pattern.compile("^[\\p{L}\\p{N}\\p{Z}\\p{P}\\p{Emoji}]+$");
+    // Regex for display name: alphanumeric, spaces, basic punctuation (allowing
+    // most characters)
+    private static final Pattern DISPLAY_NAME_PATTERN = Pattern.compile("^[\\p{L}\\p{N}\\p{Z}\\p{P}]+$");
 
     @Autowired
     private DynamoDbUserRepository userRepository;

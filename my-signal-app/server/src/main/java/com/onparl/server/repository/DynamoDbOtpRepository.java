@@ -21,7 +21,7 @@ public class DynamoDbOtpRepository {
     private final DynamoDbTable<OtpVerification> otpTable;
 
     public DynamoDbOtpRepository(DynamoDbEnhancedClient dynamoDbClient) {
-        this.otpTable = dynamoDbClient.table("onparl-otp-verifications", TableSchema.fromBean(OtpVerification.class));
+        this.otpTable = dynamoDbClient.table("onparl-otps", TableSchema.fromBean(OtpVerification.class));
     }
 
     /**
@@ -32,11 +32,11 @@ public class DynamoDbOtpRepository {
     }
 
     /**
-     * Find an OTP verification record by phone number.
+     * Find an OTP verification record by identifier.
      */
-    public Optional<OtpVerification> findByPhoneNumber(String phoneNumber) {
+    public Optional<OtpVerification> findByIdentifier(String identifier) {
         Key key = Key.builder()
-                .partitionValue(phoneNumber)
+                .partitionValue(identifier)
                 .build();
 
         OtpVerification otp = otpTable.getItem(key);
@@ -44,12 +44,12 @@ public class DynamoDbOtpRepository {
     }
 
     /**
-     * Delete an OTP verification record by phone number.
+     * Delete an OTP verification record by identifier.
      * Called after successful verification or when invalidating an OTP.
      */
-    public void deleteByPhoneNumber(String phoneNumber) {
+    public void deleteByIdentifier(String identifier) {
         Key key = Key.builder()
-                .partitionValue(phoneNumber)
+                .partitionValue(identifier)
                 .build();
 
         otpTable.deleteItem(key);
@@ -58,17 +58,17 @@ public class DynamoDbOtpRepository {
     /**
      * Increment the failed attempts counter for an OTP.
      */
-    public void incrementAttempts(String phoneNumber) {
-        findByPhoneNumber(phoneNumber).ifPresent(otp -> {
+    public void incrementAttempts(String identifier) {
+        findByIdentifier(identifier).ifPresent(otp -> {
             otp.setAttempts(otp.getAttempts() + 1);
             saveOtp(otp);
         });
     }
 
     /**
-     * Check if an OTP exists for a phone number.
+     * Check if an OTP exists for an identifier.
      */
-    public boolean existsByPhoneNumber(String phoneNumber) {
-        return findByPhoneNumber(phoneNumber).isPresent();
+    public boolean existsByIdentifier(String identifier) {
+        return findByIdentifier(identifier).isPresent();
     }
 }

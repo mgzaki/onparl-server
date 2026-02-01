@@ -2,7 +2,7 @@ import { SignalProtocolAddress, SessionBuilder, SessionCipher, KeyHelper } from 
 import { InMemorySignalProtocolStore } from './InMemorySignalProtocolStore';
 import axios from 'axios';
 
-export const SERVER_URL = 'https://d3h4r754e924ev.cloudfront.net';
+export const SERVER_URL = 'https://d1s0wr3f79sx34.cloudfront.net';
 
 export class SignalManager {
     private store: InMemorySignalProtocolStore;

@@ -22,7 +22,6 @@ import java.util.Optional;
 @Service
 public class OtpService {
 
-    private static final int OTP_LENGTH = 6;
     private static final long OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
     private static final int MAX_ATTEMPTS = 3;
     private static final long RATE_LIMIT_MS = 60 * 1000; // 60 seconds
@@ -36,18 +35,18 @@ public class OtpService {
     }
 
     /**
-     * Generate a new OTP for the given phone number.
+     * Generate a new OTP for the given identifier.
      * 
      * Rate Limiting: Will throw exception if called too frequently for the same
-     * phone.
+     * identifier.
      * 
-     * @param phoneNumber Phone number in E.164 format
-     * @return The generated 6-digit OTP (to be sent via SMS)
+     * @param identifier Phone number or Email address
+     * @return The generated 6-digit OTP (to be sent via SMS/Email)
      * @throws IllegalStateException if rate limit is exceeded
      */
-    public String generateOtp(String phoneNumber) {
+    public String generateOtp(String identifier) {
         // Check rate limit
-        Optional<OtpVerification> existing = otpRepository.findByPhoneNumber(phoneNumber);
+        Optional<OtpVerification> existing = otpRepository.findByIdentifier(identifier);
         if (existing.isPresent()) {
             long timeSinceCreation = System.currentTimeMillis() - existing.get().getCreatedAt();
             if (timeSinceCreation < RATE_LIMIT_MS) {
@@ -68,7 +67,7 @@ public class OtpService {
 
         // Create OTP verification record
         OtpVerification verification = new OtpVerification();
-        verification.setPhoneNumber(phoneNumber);
+        verification.setIdentifier(identifier);
         verification.setOtpHash(otpHash);
         verification.setSalt(salt);
         verification.setCreatedAt(System.currentTimeMillis());
@@ -83,14 +82,14 @@ public class OtpService {
     }
 
     /**
-     * Verify an OTP for the given phone number.
+     * Verify an OTP for the given identifier.
      * 
-     * @param phoneNumber Phone number in E.164 format
-     * @param otp         The OTP code to verify
+     * @param identifier Phone number or Email address
+     * @param otp        The OTP code to verify
      * @return true if OTP is valid, false otherwise
      */
-    public boolean verifyOtp(String phoneNumber, String otp) {
-        Optional<OtpVerification> verificationOpt = otpRepository.findByPhoneNumber(phoneNumber);
+    public boolean verifyOtp(String identifier, String otp) {
+        Optional<OtpVerification> verificationOpt = otpRepository.findByIdentifier(identifier);
 
         if (verificationOpt.isEmpty()) {
             return false;
@@ -100,7 +99,7 @@ public class OtpService {
 
         // Check if expired
         if (verification.isExpired()) {
-            otpRepository.deleteByPhoneNumber(phoneNumber);
+            otpRepository.deleteByIdentifier(identifier);
             return false;
         }
 
@@ -111,7 +110,7 @@ public class OtpService {
 
         // Check if max attempts reached
         if (verification.isMaxAttemptsReached()) {
-            otpRepository.deleteByPhoneNumber(phoneNumber);
+            otpRepository.deleteByIdentifier(identifier);
             return false;
         }
 
@@ -121,28 +120,28 @@ public class OtpService {
 
         if (isValid) {
             // Mark as used and delete
-            otpRepository.deleteByPhoneNumber(phoneNumber);
+            otpRepository.deleteByIdentifier(identifier);
         } else {
             // Increment failed attempts
-            otpRepository.incrementAttempts(phoneNumber);
+            otpRepository.incrementAttempts(identifier);
         }
 
         return isValid;
     }
 
     /**
-     * Invalidate (delete) an OTP for a phone number.
+     * Invalidate (delete) an OTP for an identifier.
      * Useful for logout or when user requests a new OTP.
      */
-    public void invalidateOtp(String phoneNumber) {
-        otpRepository.deleteByPhoneNumber(phoneNumber);
+    public void invalidateOtp(String identifier) {
+        otpRepository.deleteByIdentifier(identifier);
     }
 
     /**
      * Get remaining attempts for an OTP.
      */
-    public int getRemainingAttempts(String phoneNumber) {
-        return otpRepository.findByPhoneNumber(phoneNumber)
+    public int getRemainingAttempts(String identifier) {
+        return otpRepository.findByIdentifier(identifier)
                 .map(otp -> Math.max(0, MAX_ATTEMPTS - otp.getAttempts()))
                 .orElse(0);
     }
@@ -150,8 +149,8 @@ public class OtpService {
     /**
      * Get time until OTP expiry in seconds.
      */
-    public long getSecondsUntilExpiry(String phoneNumber) {
-        return otpRepository.findByPhoneNumber(phoneNumber)
+    public long getSecondsUntilExpiry(String identifier) {
+        return otpRepository.findByIdentifier(identifier)
                 .map(otp -> Math.max(0, (otp.getExpiresAt() - System.currentTimeMillis()) / 1000))
                 .orElse(0L);
     }

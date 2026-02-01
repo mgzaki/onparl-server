@@ -9,3 +9,9 @@ variable "environment" {
   type        = string
   default     = "dev"
 }
+
+variable "sender_email" {
+  description = "Email address to verify in SES for sending OTPs"
+  type        = string
+  default     = "mgzaki2406@gmail.com"
+}
