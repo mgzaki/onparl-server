@@ -2,7 +2,7 @@ import { SignalProtocolAddress, SessionBuilder, SessionCipher, KeyHelper } from 
 import { InMemorySignalProtocolStore } from './InMemorySignalProtocolStore';
 import axios from 'axios';
 
-export const SERVER_URL = 'https://d1s0wr3f79sx34.cloudfront.net';
+export const SERVER_URL = 'https://d30popws4xs094.cloudfront.net';
 
 export class SignalManager {
     private store: InMemorySignalProtocolStore;
@@ -10,13 +10,24 @@ export class SignalManager {
 
     constructor(userId: string) {
         this.userId = userId;
-        this.store = new InMemorySignalProtocolStore();
+        this.store = new InMemorySignalProtocolStore(userId);
     }
 
     async initialize(): Promise<void> {
         console.log('[SignalManager] Initializing for user:', this.userId);
 
         try {
+            // Check if keys already exist (restored from storage)
+            const existingId = await this.store.getIdentityKeyPair();
+            const existingRegId = await this.store.getLocalRegistrationId();
+
+            if (existingId && existingRegId) {
+                console.log('[SignalManager] Keys found in storage. Skipping new key generation.');
+                return;
+            }
+
+            console.log('[SignalManager] No keys found. Generating new keys...');
+
             // Generate identity key pair
             const identityKeyPair = await KeyHelper.generateIdentityKeyPair();
             await this.store.putIdentityKeyPair(identityKeyPair);

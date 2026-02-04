@@ -1,8 +1,11 @@
 package com.onparl.server.model;
 
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * User entity for phone-based authentication.
@@ -87,6 +90,16 @@ public class User {
      * New users must complete profile setup before accessing chat.
      */
     private boolean profileComplete;
+
+    /**
+     * Set of User IDs that this user has added as contacts.
+     */
+    private Set<String> contacts = new HashSet<>();
+
+    /**
+     * Set of User IDs that this user has blocked.
+     */
+    private Set<String> blockedUsers = new HashSet<>();
 
     public User() {
         // Default constructor required by DynamoDB mapper
@@ -187,5 +200,23 @@ public class User {
 
     public void setProfileComplete(boolean profileComplete) {
         this.profileComplete = profileComplete;
+    }
+
+    @DynamoDbAttribute("contacts")
+    public Set<String> getContacts() {
+        return (contacts == null || contacts.isEmpty()) ? null : contacts;
+    }
+
+    public void setContacts(Set<String> contacts) {
+        this.contacts = (contacts != null) ? contacts : new HashSet<>();
+    }
+
+    @DynamoDbAttribute("blockedUsers")
+    public Set<String> getBlockedUsers() {
+        return (blockedUsers == null || blockedUsers.isEmpty()) ? null : blockedUsers;
+    }
+
+    public void setBlockedUsers(Set<String> blockedUsers) {
+        this.blockedUsers = (blockedUsers != null) ? blockedUsers : new HashSet<>();
     }
 }

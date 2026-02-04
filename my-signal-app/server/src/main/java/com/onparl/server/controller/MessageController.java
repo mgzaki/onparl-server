@@ -84,13 +84,14 @@ public class MessageController {
         entity.setContent(message.getContent()); // This is encrypted!
         entity.setTimestamp(message.getTimestamp());
 
-        // Persist to DynamoDB (for offline delivery and message history)
-        messageRepository.save(entity);
-
         // Real-time push: Send encrypted message to recipient's WebSocket topic
         // If recipient is online and subscribed to "/topic/messages/{recipientId}",
         // they'll receive this immediately without polling
+        // OPTIMIZATION: Send BEFORE saving to DB for instant delivery!
         messagingTemplate.convertAndSend("/topic/messages/" + message.getRecipientId(), message);
+
+        // Persist to DynamoDB (for offline delivery and message history)
+        messageRepository.save(entity);
     }
 
     /**
